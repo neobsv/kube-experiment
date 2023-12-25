@@ -1,0 +1,200 @@
+0) Make the maximize and minimize buttons visible on Fedora 39:
+gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close'
+
+==== Installed Virtualbox on Fedora 39 from official download site => DON'T
+
+sudo dnf remove VirtualBox-*
+
+1) Install Virtualbox using this guide: https://idroot.us/install-vagrant-fedora-39/
+
+To install VirtualBox, you first need to add the VirtualBox RPM repository to your Fedora system. You can do this by running the following commands:
+
+sudo dnf -y install wget
+wget http://download.virtualbox.org/virtualbox/rpm/fedora/virtualbox.repo
+sudo mv virtualbox.repo /etc/yum.repos.d/virtualbox.repo
+
+After adding the repository, you can install VirtualBox with the following commands:
+
+sudo dnf install gcc binutils make glibc-devel patch libgomp glibc-headers kernel-headers kernel-devel-`uname -r` dkms
+sudo dnf install VirtualBox-7.0
+
+Next, add your user account to the vboxusers group:
+
+sudo usermod -a -G vboxusers ${USER}
+
+Finally, configure the VirtualBox drivers:
+
+sudo /usr/lib/virtualbox/vboxdrv.sh setup
+
+This command will stop the VirtualBox services, start them again, and build the VirtualBox kernel modules.
+
+
+2) Installed ansible from official download site,
+sudo dnf install ansible
+sudo dnf install ansible-collection-community-general
+ansible --version
+ansible-community --version
+
+3) Installed vagrant from dnf repos:
+
+sudo dnf -y install vagrant 
+sudo systemctl start virtnetworkd
+
+4) Init the boxes:
+vagrant init centos/8
+
+=> Faced the error while bringing up both vms:
+$ vagrant up
+...
+...
+==> default:  -- Video VRAM:        16384
+==> default:  -- Video 3D accel:    false
+==> default:  -- Keymap:            en-us
+==> default:  -- TPM Backend:       passthrough
+==> default:  -- INPUT:             type=mouse, bus=ps2
+==> default: Removing domain...
+==> default: Deleting the machine folder
+/usr/share/vagrant/gems/gems/vagrant-libvirt-0.11.2/lib/vagrant-libvirt/driver.rb:65:in `open_read_only': Call to virConnectOpenReadOnly failed: Failed to connect socket to '/var/run/libvirt/virtqemud-sock-ro': Connection refused (Libvirt::ConnectionError)
+    from /usr/share/vagrant/gems/gems/vagrant-libvirt-0.11.2/lib/vagrant-libvirt/driver.rb:65:in `system_connection'
+    from /usr/share/vagrant/gems/gems/vagrant-libvirt-0.11.2/lib/vagrant-libvirt/driver.rb:202:in `list_all_networks'
+    from /usr/share/vagrant/gems/gems/vagrant-libvirt-0.11.2/lib/vagrant-libvirt/util/network_util.rb:157:in `libvirt_networks'
+    from /usr/share/vagrant/gems/gems/vagrant-libvirt-0.11.2/lib/vagrant-libvirt/action/create_networks.rb:38:in `call'
+    from /usr/share/vagrant/gems/gems/vagrant-2.3.4/lib/vagrant/action/warden.rb:48:in `call'
+    from /usr/share/vagrant/gems/gems/vagrant-libvirt-0.11.2/lib/vagrant-libvirt/action/create_domain.rb:452:in `call'
+
+
+5) Tweak to get vargrant to start running:
+
+sudo dnf install kernel-devel kernel-devel-`uname -r` gcc binutils make perl-interpreter bzip2 elfutils-libelf-devel
+
+systemctl enable virtqemud
+systemctl start virtqemud
+
+==> Not working so, delete all the folders and clean vagrant:
+
+6) Completely clean all volumes and vms created, in Fedora 39 by vagrant:
+
+Install virsh:
+sudo dnf groupinfo virtualization
+sudo dnf install @virtualization
+
+Remove domain:
+virsh list --all
+virsh destroy <THE_MACHINE> 
+virsh undefine <THE_MACHINE> --snapshots-metadata --managed-save
+virsh vol-list default
+virsh vol-delete --pool default <THE_VOLUME>
+
+7) Init the centos/8 vm:
+vagrant init centos/8
+vagrant up --provider=virtualbox
+
+
+8) Virtualbox should show running vagrant vms: (DON'T run Virtualbox as root!)
+$ virtualbox
+
+
+
+========================================================================== SKIP =============================================================================================
+
+
+Error shown, use command 'sudo /sbin/vboxconfig' to reinstall kernel module
+=> Another error:
+    This system is currently not set up to build kernel modules.
+    Please install the gcc make perl packages from your distribution.
+    Please install the Linux kernel "header" files matching the current kernel
+    for adding new hardware support to the system.
+    The distribution packages containing the headers are probably:
+        kernel-devel kernel-devel-6.6.4-200.fc39.x86_64
+
+Fix: https://superuser.com/questions/1592560/fedora-31-please-install-the-linux-kernel-header-files-matching-the-current
+
+The first step in the installation of VirtualBox guest additions is the installation of kernel headers. This includes the installation of the dkms package (Dynamic Kernel Module Support) alongside other build tools as shown.
+
+$ sudo dnf install dkms kernel-devel gcc bzip2 make curl perl
+Once you have successfully installed kernel headers, you need to confirm the version of the Linux kernel and ensure it matches the version of the just installed kernel headers.
+To check the version of the Linux kernel run the command.
+$ uname -r OR $ hostnamectl | grep -i kernel
+To check the version of the kernel development tool (kernel-devel) execute.
+$ sudo rpm -qa sudo dnf install VirtualBox-7.0kernel-devel
+Verify Linux Kernel Headers Verify Linux Kernel Headers
+If the versions of the two (kernel version and kernel-devel) do not match as shown in the screenshot above, update the kernel using the command.
+$ sudo dnf update kernel-*
+When you are done updating the kernel, reboot the system, and again, verify the kernel version again.
+$ uname -r
+
+
+Run sudo /sbin/vboxconfig again:
+
+==> Another error:
+
+System is running in Secure Boot mode, however your distribution
+does not provide tools for automatic generation of keys needed for
+modules signing. Please consider to generate and enroll them manually:
+
+    sudo mkdir -p /var/lib/shim-signed/mok
+    sudo openssl req -nodes -new -x509 -newkey rsa:2048 -outform DER -addext "extendedKeyUsage=codeSigning" -keyout /var/lib/shim-signed/mok/MOK.priv -out /var/lib/shim-signed/mok/MOK.der
+    sudo mokutil --import /var/lib/shim-signed/mok/MOK.der
+    sudo reboot
+
+    **IMPORTANT**: Select 'Enroll MOK' on the blue screen after the system reboots, and then use the key you created, then enter the password that was set. Then finally reboot.
+
+Restart "sudo rcvboxdrv setup" after system is rebooted
+
+========
+==> Another error: vboxdrv.sh: You must sign these kernel modules before using VirtualBox:
+  vboxdrv vboxnetflt vboxnetadp
+  => This happens if you miss the IMPORTANT step of 'Enroll MOK' on the blue screen after reboot.
+========
+
+Done. Virtualbox opens without any errors.
+
+========================================================================== SKIP =============================================================================================
+
+To completely uninstall virtualbox:
+sudo dnf remove VirtualBox-*
+
+==> Trying the rockylinux/9 vm,
+==> default: Mounting shared folders...
+    default: /vagrant => /home/thebsv/work/vagrantvms/rocky-leader
+Vagrant was unable to mount VirtualBox shared folders. This is usually
+because the filesystem "vboxsf" is not available. This filesystem is
+made available via the VirtualBox Guest Additions and kernel module.
+Please verify that these guest additions are properly installed in the
+guest. This is not a bug in Vagrant and is usually caused by a faulty
+Vagrant box. For context, the command attempted was:
+
+mount -t vboxsf -o uid=1000,gid=1000,_netdev vagrant /vagrant
+
+The error output from the command was:
+
+/sbin/mount.vboxsf: mounting failed with the error: No such device
+
+==> Fix: 
+$ vagrant plugin install vagrant-vbguest
+
+
+9) Init the rockylinux/9 vm:
+vagrant init rockylinux/9
+
+Run:
+vagrant plugin install vagrant-vbguest
+vagrant up --provider=virtualbox OR vagrant up (if provider is specified in Vagrantfile)
+
+==> Do not check for guest additions:
+https://developer.hashicorp.com/vagrant/docs/providers/virtualbox/configuration#checking-for-guest-additions
+
+Add the following line to the provider virtualbox section of the Vagrantfile:
+config.vm.provider "virtualbox" do |v|
+  v.check_guest_additions = false
+end
+
+==> Disable shared/synced folders: 
+https://developer.hashicorp.com/vagrant/docs/synced-folders/basic_usage#disabling
+
+config.vm.synced_folder ".", "/vagrant", disabled: true
+
+
+Rocky 9 is now working with vagrant with provider virtualbox.
+
+
